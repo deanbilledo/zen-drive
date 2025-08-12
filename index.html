@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zen Drive - A Meditative Driving Experience</title>
+    <link rel="stylesheet" href="css/style.css">
+    <meta name="description" content="A zen driving experience featuring procedural terrain generation and immersive 3D graphics">
+    <meta name="keywords" content="zen, driving, 3D, WebGL, procedural, meditation">
+</head>
+<body>
+    <!-- Loading Screen -->
+    <div id="loading-screen">
+        <div class="loading-content">
+            <h1>Zen Drive</h1>
+            <div class="loading-bar">
+                <div class="loading-progress" id="loading-progress"></div>
+            </div>
+            <p id="loading-text">Preparing your journey...</p>
+        </div>
+    </div>
+
+    <!-- Main Game Canvas -->
+    <canvas id="game-canvas"></canvas>
+
+    <!-- UI Overlay -->
+    <div id="ui-overlay">
+        <!-- Speed Display -->
+        <div class="ui-element speed-display">
+            <span id="speed-value">0</span>
+            <span class="unit">MPH</span>
+        </div>
+
+        <!-- Time Display -->
+        <div class="ui-element time-display">
+            <span id="time-value">12:00</span>
+        </div>
+
+        <!-- Controls Help -->
+        <div class="ui-element controls-help" id="controls-help">
+            <h3>Controls</h3>
+            <div class="control-item"><kbd>W</kbd> / <kbd>↑</kbd> Accelerate</div>
+            <div class="control-item"><kbd>S</kbd> / <kbd>↓</kbd> Brake/Reverse</div>
+            <div class="control-item"><kbd>A</kbd> / <kbd>←</kbd> Steer Left</div>
+            <div class="control-item"><kbd>D</kbd> / <kbd>→</kbd> Steer Right</div>
+            <div class="control-item"><kbd>Space</kbd> Handbrake</div>
+            <div class="control-item"><kbd>R</kbd> Reset Position</div>
+            <div class="control-item"><kbd>F</kbd> Toggle Fullscreen</div>
+            <div class="control-item"><kbd>T</kbd> Toggle Time Speed</div>
+            <div class="control-item"><kbd>H</kbd> Toggle Help</div>
+        </div>
+
+        <!-- Settings Panel -->
+        <div class="ui-element settings-panel" id="settings-panel">
+            <button class="settings-btn" id="settings-toggle">⚙</button>
+            <div class="settings-content" id="settings-content">
+                <h3>Settings</h3>
+                <div class="setting-item">
+                    <label for="graphics-quality">Graphics Quality:</label>
+                    <select id="graphics-quality">
+                        <option value="low">Low</option>
+                        <option value="medium" selected>Medium</option>
+                        <option value="high">High</option>
+                        <option value="ultra">Ultra</option>
+                    </select>
+                </div>
+                <div class="setting-item">
+                    <label for="render-distance">Render Distance:</label>
+                    <input type="range" id="render-distance" min="500" max="2000" value="1000">
+                    <span id="render-distance-value">1000m</span>
+                </div>
+                <div class="setting-item">
+                    <label for="fog-density">Fog Density:</label>
+                    <input type="range" id="fog-density" min="0" max="100" value="30">
+                    <span id="fog-density-value">30%</span>
+                </div>
+                <div class="setting-item">
+                    <label for="camera-lag">Camera Smoothness:</label>
+                    <input type="range" id="camera-lag" min="1" max="10" value="5">
+                    <span id="camera-lag-value">5</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Performance Monitor -->
+        <div class="ui-element performance-monitor" id="performance-monitor">
+            <div class="fps-counter">FPS: <span id="fps-value">60</span></div>
+            <div class="frame-time">Frame: <span id="frame-time">16.7ms</span></div>
+            <div class="memory-usage">Memory: <span id="memory-usage">0MB</span></div>
+        </div>
+    </div>
+
+    <!-- Error Display -->
+    <div id="error-display" class="hidden">
+        <div class="error-content">
+            <h2>WebGL Error</h2>
+            <p id="error-message">Your browser doesn't support WebGL or it's disabled.</p>
+            <p>Please try updating your browser or enabling WebGL in your browser settings.</p>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="js/simple-systems.js?v=2"></script>
+    <script src="js/minimal.js?v=2"></script>
+    <script src="js/utils/math.js?v=2"></script>
+    <script src="js/utils/noise.js?v=2"></script>
+    <script src="js/engine/renderer.js?v=2"></script>
+    <script src="js/engine/camera.js?v=2"></script>
+    <script src="js/engine/input.js?v=2"></script>
+    <script src="js/world/terrain.js?v=2"></script>
+    <script src="js/world/road.js?v=2"></script>
+    <script src="js/world/environment.js?v=2"></script>
+    <script src="js/vehicle/car.js?v=2"></script>
+    <script src="js/main.js?v=2"></script>
+</body>
+</html>

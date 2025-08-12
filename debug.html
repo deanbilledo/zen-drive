@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WebGL Debug</title>
+    <style>
+        body { margin: 0; background: #000; }
+        canvas { display: block; }
+    </style>
+</head>
+<body>
+    <canvas id="debug-canvas"></canvas>
+    <script>
+        // Simple WebGL test
+        const canvas = document.getElementById('debug-canvas');
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        
+        const gl = canvas.getContext('webgl2');
+        if (!gl) {
+            document.body.innerHTML = '<h1>WebGL 2.0 not supported</h1>';
+        } else {
+            // Clear to red to test basic functionality
+            gl.clearColor(1.0, 0.0, 0.0, 1.0);
+            gl.clear(gl.COLOR_BUFFER_BIT);
+            
+            console.log('WebGL 2.0 working! Canvas:', canvas.width, 'x', canvas.height);
+            document.body.innerHTML += '<div style="color: white; position: absolute; top: 10px; left: 10px;">WebGL 2.0 Working!</div>';
+        }
+    </script>
+</body>
+</html>

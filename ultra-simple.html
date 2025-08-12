@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zen Drive - Ultra Simple Test</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            background: #000;
+            overflow: hidden;
+        }
+        #game-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+        }
+        #debug {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: white;
+            font-family: Arial;
+            z-index: 100;
+            background: rgba(0,0,0,0.5);
+            padding: 10px;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="game-canvas"></canvas>
+    <div id="debug">
+        <div>Status: <span id="status">Starting...</span></div>
+        <div>Frame: <span id="frame">0</span></div>
+        <div>WebGL: <span id="webgl">Checking...</span></div>
+    </div>
+
+    <script>
+        class UltraSimpleGame {
+            constructor() {
+                this.frameCount = 0;
+                this.canvas = document.getElementById('game-canvas');
+                this.statusEl = document.getElementById('status');
+                this.frameEl = document.getElementById('frame');
+                this.webglEl = document.getElementById('webgl');
+                
+                this.init();
+            }
+
+            init() {
+                try {
+                    this.statusEl.textContent = 'Initializing canvas...';
+                    
+                    // Set canvas size
+                    this.canvas.width = window.innerWidth;
+                    this.canvas.height = window.innerHeight;
+                    
+                    this.statusEl.textContent = 'Getting WebGL context...';
+                    
+                    // Get WebGL context
+                    this.gl = this.canvas.getContext('webgl2');
+                    if (!this.gl) {
+                        throw new Error('WebGL 2.0 not supported');
+                    }
+                    
+                    this.webglEl.textContent = 'Working!';
+                    this.statusEl.textContent = 'Creating simple terrain...';
+                    
+                    // Set viewport
+                    this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
+                    this.gl.enable(this.gl.DEPTH_TEST);
+                    
+                    // Create simple colored rectangles for terrain, road, and car
+                    this.setupSimpleShapes();
+                    
+                    this.statusEl.textContent = 'Starting render loop...';
+                    
+                    // Start render loop
+                    this.render();
+                    
+                } catch (error) {
+                    this.statusEl.textContent = 'Error: ' + error.message;
+                    this.webglEl.textContent = 'Failed!';
+                    console.error(error);
+                }
+            }
+
+            setupSimpleShapes() {
+                // Create a simple shader program
+                const vertexShaderSource = `#version 300 es
+                    in vec4 a_position;
+                    in vec3 a_color;
+                    uniform mat4 u_matrix;
+                    out vec3 v_color;
+                    
+                    void main() {
+                        gl_Position = u_matrix * a_position;
+                        v_color = a_color;
+                    }
+                `;
+                
+                const fragmentShaderSource = `#version 300 es
+                    precision mediump float;
+                    in vec3 v_color;
+                    out vec4 outColor;
+                    
+                    void main() {
+                        outColor = vec4(v_color, 1.0);
+                    }
+                `;
+                
+                // Create shaders
+                const vertexShader = this.createShader(this.gl.VERTEX_SHADER, vertexShaderSource);
+                const fragmentShader = this.createShader(this.gl.FRAGMENT_SHADER, fragmentShaderSource);
+                
+                // Create program
+                this.program = this.gl.createProgram();
+                this.gl.attachShader(this.program, vertexShader);
+                this.gl.attachShader(this.program, fragmentShader);
+                this.gl.linkProgram(this.program);
+                
+                // Get attribute and uniform locations
+                this.positionLocation = this.gl.getAttribLocation(this.program, 'a_position');
+                this.colorLocation = this.gl.getAttribLocation(this.program, 'a_color');
+                this.matrixLocation = this.gl.getUniformLocation(this.program, 'u_matrix');
+                
+                // Create shapes data
+                this.createShapes();
+            }
+
+            createShader(type, source) {
+                const shader = this.gl.createShader(type);
+                this.gl.shaderSource(shader, source);
+                this.gl.compileShader(shader);
+                
+                if (!this.gl.getShaderParameter(shader, this.gl.COMPILE_STATUS)) {
+                    console.error('Shader compile error:', this.gl.getShaderInfoLog(shader));
+                    this.gl.deleteShader(shader);
+                    return null;
+                }
+                
+                return shader;
+            }
+
+            createShapes() {
+                // Terrain (green rectangle)
+                const terrainVertices = new Float32Array([
+                    -5, -1, -5,  0, 0.5, 0,  // Bottom left
+                     5, -1, -5,  0, 0.5, 0,  // Bottom right
+                    -5, -1,  5,  0, 0.5, 0,  // Top left
+                     5, -1,  5,  0, 0.5, 0,  // Top right
+                ]);
+                
+                // Road (gray rectangle)
+                const roadVertices = new Float32Array([
+                    -0.5, -0.9, -5,  0.5, 0.5, 0.5,  // Bottom left
+                     0.5, -0.9, -5,  0.5, 0.5, 0.5,  // Bottom right
+                    -0.5, -0.9,  5,  0.5, 0.5, 0.5,  // Top left
+                     0.5, -0.9,  5,  0.5, 0.5, 0.5,  // Top right
+                ]);
+                
+                // Car (red rectangle)
+                const carVertices = new Float32Array([
+                    -0.2, 0, -0.2,  1, 0, 0,  // Bottom left
+                     0.2, 0, -0.2,  1, 0, 0,  // Bottom right
+                    -0.2, 0.5, -0.2,  1, 0, 0,  // Top left
+                     0.2, 0.5, -0.2,  1, 0, 0,  // Top right
+                ]);
+                
+                // Create buffers
+                this.terrainBuffer = this.createBuffer(terrainVertices);
+                this.roadBuffer = this.createBuffer(roadVertices);
+                this.carBuffer = this.createBuffer(carVertices);
+            }
+
+            createBuffer(data) {
+                const buffer = this.gl.createBuffer();
+                this.gl.bindBuffer(this.gl.ARRAY_BUFFER, buffer);
+                this.gl.bufferData(this.gl.ARRAY_BUFFER, data, this.gl.STATIC_DRAW);
+                return buffer;
+            }
+
+            render() {
+                this.frameCount++;
+                this.frameEl.textContent = this.frameCount;
+                
+                // Clear screen
+                this.gl.clearColor(0.4, 0.7, 1.0, 1.0); // Sky blue
+                this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
+                
+                // Use our shader program
+                this.gl.useProgram(this.program);
+                
+                // Set up a simple camera matrix
+                const matrix = this.createCameraMatrix();
+                this.gl.uniformMatrix4fv(this.matrixLocation, false, matrix);
+                
+                // Draw terrain
+                this.drawShape(this.terrainBuffer);
+                
+                // Draw road
+                this.drawShape(this.roadBuffer);
+                
+                // Draw car
+                this.drawShape(this.carBuffer);
+                
+                // Continue render loop
+                requestAnimationFrame(() => this.render());
+            }
+
+            drawShape(buffer) {
+                this.gl.bindBuffer(this.gl.ARRAY_BUFFER, buffer);
+                
+                // Position attribute
+                this.gl.enableVertexAttribArray(this.positionLocation);
+                this.gl.vertexAttribPointer(this.positionLocation, 3, this.gl.FLOAT, false, 24, 0);
+                
+                // Color attribute
+                this.gl.enableVertexAttribArray(this.colorLocation);
+                this.gl.vertexAttribPointer(this.colorLocation, 3, this.gl.FLOAT, false, 24, 12);
+                
+                // Draw
+                this.gl.drawArrays(this.gl.TRIANGLE_STRIP, 0, 4);
+            }
+
+            createCameraMatrix() {
+                // Simple perspective projection looking down at the scene
+                const aspect = this.canvas.width / this.canvas.height;
+                const fov = Math.PI / 4;
+                const near = 0.1;
+                const far = 100;
+                
+                // Create a simple perspective matrix
+                const f = Math.tan(Math.PI * 0.5 - 0.5 * fov);
+                const rangeInv = 1.0 / (near - far);
+                
+                return new Float32Array([
+                    f / aspect, 0, 0, 0,
+                    0, f, 0, 0,
+                    0, 0, (near + far) * rangeInv, -1,
+                    0, 3, -5, 0  // Camera position: up and back
+                ]);
+            }
+        }
+
+        // Start the ultra simple game
+        document.addEventListener('DOMContentLoaded', () => {
+            new UltraSimpleGame();
+        });
+    </script>
+</body>
+</html>

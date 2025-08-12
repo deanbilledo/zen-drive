@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zen Drive - Simple Test</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            background: #000;
+            overflow: hidden;
+        }
+        #game-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+        }
+        #info {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: white;
+            font-family: Arial;
+            z-index: 100;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="game-canvas"></canvas>
+    <div id="info">Loading Zen Drive...</div>
+
+    <script>
+        // Simple test implementation
+        class SimpleZenDrive {
+            constructor() {
+                this.canvas = document.getElementById('game-canvas');
+                this.info = document.getElementById('info');
+                this.init();
+            }
+
+            init() {
+                try {
+                    this.info.textContent = 'Initializing WebGL...';
+                    
+                    // Set canvas size
+                    this.canvas.width = window.innerWidth;
+                    this.canvas.height = window.innerHeight;
+                    
+                    // Get WebGL context
+                    this.gl = this.canvas.getContext('webgl2');
+                    if (!this.gl) {
+                        throw new Error('WebGL 2.0 not supported');
+                    }
+                    
+                    this.info.textContent = 'WebGL initialized. Creating simple scene...';
+                    
+                    // Set viewport
+                    this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
+                    
+                    // Set clear color to a nice sky blue
+                    this.gl.clearColor(0.53, 0.81, 0.92, 1.0);
+                    this.gl.enable(this.gl.DEPTH_TEST);
+                    
+                    this.info.textContent = 'Zen Drive - Simple Test Running';
+                    
+                    // Start render loop
+                    this.render();
+                    
+                } catch (error) {
+                    this.info.textContent = 'Error: ' + error.message;
+                    console.error(error);
+                }
+            }
+
+            render() {
+                // Clear the screen
+                this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
+                
+                // Continue render loop
+                requestAnimationFrame(() => this.render());
+            }
+        }
+
+        // Start when DOM is loaded
+        document.addEventListener('DOMContentLoaded', () => {
+            new SimpleZenDrive();
+        });
+    </script>
+</body>
+</html>
