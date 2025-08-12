@@ -1,0 +1,1139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zen Drive - Enhanced 3D Graphics</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            background: linear-gradient(to bottom, #87CEEB 0%, #98D8E8 100%);
+            overflow: hidden;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        #gameCanvas {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+            cursor: none;
+        }
+        #ui {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: white;
+            background: linear-gradient(145deg, rgba(0,0,0,0.8), rgba(0,0,0,0.6));
+            padding: 20px;
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.1);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+            z-index: 100;
+            font-size: 14px;
+            min-width: 200px;
+        }
+        #controls {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            color: white;
+            background: linear-gradient(145deg, rgba(0,0,0,0.8), rgba(0,0,0,0.6));
+            padding: 20px;
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.1);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+            z-index: 100;
+            font-size: 14px;
+        }
+        #loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-size: 28px;
+            font-weight: bold;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+            z-index: 1000;
+            text-align: center;
+        }
+        .ui-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            padding: 5px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        .ui-label {
+            font-weight: bold;
+            color: #E0E0E0;
+        }
+        .ui-value {
+            color: #00FF88;
+            font-family: 'Courier New', monospace;
+        }
+    </style>
+</head>
+<body>
+    <div id="loading">
+        <div>🏎️ ZEN DRIVE 3D 🏎️</div>
+        <div style="font-size: 18px; margin-top: 10px;">Loading Enhanced Graphics...</div>
+    </div>
+    <canvas id="gameCanvas"></canvas>
+    <div id="ui">
+        <div style="font-weight: bold; margin-bottom: 15px; color: #00FF88; font-size: 16px;">🏎️ ZEN DRIVE</div>
+        <div class="ui-row">
+            <span class="ui-label">Speed:</span>
+            <span class="ui-value"><span id="speed">0</span> mph</span>
+        </div>
+        <div class="ui-row">
+            <span class="ui-label">FPS:</span>
+            <span class="ui-value" id="fps">60</span>
+        </div>
+        <div class="ui-row">
+            <span class="ui-label">Position:</span>
+            <span class="ui-value">X: <span id="carX">0</span></span>
+        </div>
+        <div class="ui-row">
+            <span class="ui-label"></span>
+            <span class="ui-value">Z: <span id="carZ">0</span></span>
+        </div>
+        <div class="ui-row">
+            <span class="ui-label">Camera:</span>
+            <span class="ui-value" id="cameraMode">Follow</span>
+        </div>
+        <div style="margin-top: 15px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.2);">
+            <div class="ui-label">Status:</div>
+            <div style="color: #FFD700; margin-top: 5px;" id="status">Starting...</div>
+        </div>
+    </div>
+    <div id="controls">
+        <div style="font-weight: bold; margin-bottom: 15px; color: #00FF88;">🎮 CONTROLS</div>
+        <div style="margin-bottom: 8px;"><strong>W/↑</strong> - Accelerate</div>
+        <div style="margin-bottom: 8px;"><strong>S/↓</strong> - Reverse/Brake</div>
+        <div style="margin-bottom: 8px;"><strong>A/←</strong> - Turn Left</div>
+        <div style="margin-bottom: 8px;"><strong>D/→</strong> - Turn Right</div>
+        <div style="margin-bottom: 8px;"><strong>Space</strong> - Handbrake</div>
+        <div style="margin-bottom: 8px;"><strong>C</strong> - Change Camera</div>
+        <div style="margin-bottom: 8px;"><strong>Mouse</strong> - Look Around</div>
+    </div>
+
+    <script>
+        console.log('🏎️ Starting Enhanced Zen Drive 3D...');
+        
+        class ZenDriveEnhanced {
+            constructor() {
+                this.canvas = document.getElementById('gameCanvas');
+                this.gl = null;
+                this.program = null;
+                
+                // Enhanced Camera System
+                this.camera = {
+                    position: [0, 12, 20],
+                    target: [0, 0, 0],
+                    up: [0, 1, 0],
+                    mode: 'follow', // 'follow', 'chase', 'orbit', 'cockpit'
+                    distance: 15,
+                    height: 8,
+                    smoothing: 0.1,
+                    mouseX: 0,
+                    mouseY: 0,
+                    angle: 0
+                };
+                
+                // Enhanced Car
+                this.car = {
+                    position: [0, 0.5, 0],
+                    rotation: 0,
+                    velocity: [0, 0],
+                    speed: 0,
+                    wheelRotation: 0,
+                    steerAngle: 0
+                };
+                
+                // Input
+                this.keys = {};
+                this.mouse = { x: 0, y: 0, down: false };
+                
+                // Meshes
+                this.terrain = null;
+                this.road = null;
+                this.carMesh = null;
+                this.trees = [];
+                
+                // Timing
+                this.lastTime = 0;
+                this.frameCount = 0;
+                
+                // Noise function for terrain
+                this.noise = this.createNoiseFunction();
+                
+                this.init();
+            }
+            
+            // Simple noise function for terrain generation
+            createNoiseFunction() {
+                const permutation = [];
+                for (let i = 0; i < 256; i++) permutation[i] = i;
+                
+                // Shuffle
+                for (let i = 255; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [permutation[i], permutation[j]] = [permutation[j], permutation[i]];
+                }
+                
+                const p = [...permutation, ...permutation];
+                
+                const fade = t => t * t * t * (t * (t * 6 - 15) + 10);
+                const lerp = (t, a, b) => a + t * (b - a);
+                const grad = (hash, x, y) => {
+                    const h = hash & 15;
+                    const u = h < 8 ? x : y;
+                    const v = h < 4 ? y : h === 12 || h === 14 ? x : 0;
+                    return ((h & 1) === 0 ? u : -u) + ((h & 2) === 0 ? v : -v);
+                };
+                
+                return (x, y) => {
+                    const X = Math.floor(x) & 255;
+                    const Y = Math.floor(y) & 255;
+                    x -= Math.floor(x);
+                    y -= Math.floor(y);
+                    const u = fade(x);
+                    const v = fade(y);
+                    const A = p[X] + Y;
+                    const AA = p[A];
+                    const AB = p[A + 1];
+                    const B = p[X + 1] + Y;
+                    const BA = p[B];
+                    const BB = p[B + 1];
+                    
+                    return lerp(v, lerp(u, grad(p[AA], x, y),
+                                          grad(p[BA], x - 1, y)),
+                                   lerp(u, grad(p[AB], x, y - 1),
+                                          grad(p[BB], x - 1, y - 1)));
+                };
+            }
+            
+            async init() {
+                try {
+                    this.updateStatus('🔧 Initializing WebGL...');
+                    await this.sleep(200);
+                    
+                    if (!this.initWebGL()) {
+                        throw new Error('WebGL initialization failed');
+                    }
+                    
+                    this.updateStatus('🎨 Creating Advanced Shaders...');
+                    await this.sleep(200);
+                    
+                    if (!this.createShaders()) {
+                        throw new Error('Shader creation failed');
+                    }
+                    
+                    this.updateStatus('🏔️ Generating Stunning Terrain...');
+                    await this.sleep(300);
+                    this.createEnhancedTerrain();
+                    
+                    this.updateStatus('🛣️ Building Premium Road...');
+                    await this.sleep(200);
+                    this.createEnhancedRoad();
+                    
+                    this.updateStatus('🏎️ Crafting Realistic Car Model...');
+                    await this.sleep(300);
+                    this.createRealisticCar();
+                    
+                    this.updateStatus('🌲 Adding Environmental Details...');
+                    await this.sleep(200);
+                    this.createTrees();
+                    
+                    this.updateStatus('🎮 Setting up Enhanced Controls...');
+                    await this.sleep(200);
+                    this.setupInput();
+                    
+                    document.getElementById('loading').style.display = 'none';
+                    this.updateStatus('✅ Ready! Experience the zen drive!');
+                    
+                    this.startRenderLoop();
+                    
+                } catch (error) {
+                    console.error('❌ Initialization error:', error);
+                    this.updateStatus('❌ Error: ' + error.message);
+                }
+            }
+            
+            sleep(ms) {
+                return new Promise(resolve => setTimeout(resolve, ms));
+            }
+            
+            initWebGL() {
+                this.canvas.width = window.innerWidth;
+                this.canvas.height = window.innerHeight;
+                
+                this.gl = this.canvas.getContext('webgl') || this.canvas.getContext('experimental-webgl');
+                
+                if (!this.gl) {
+                    alert('❌ WebGL not supported in this browser');
+                    return false;
+                }
+                
+                // Enable features
+                this.gl.enable(this.gl.DEPTH_TEST);
+                this.gl.enable(this.gl.CULL_FACE);
+                this.gl.cullFace(this.gl.BACK);
+                this.gl.depthFunc(this.gl.LEQUAL);
+                
+                // Set viewport
+                this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
+                
+                console.log('✅ WebGL context created successfully');
+                return true;
+            }
+            
+            createShaders() {
+                const vertexShaderSource = `
+                    attribute vec3 aPosition;
+                    attribute vec3 aColor;
+                    attribute vec3 aNormal;
+                    
+                    uniform mat4 uProjection;
+                    uniform mat4 uView;
+                    uniform mat4 uModel;
+                    uniform vec3 uLightDirection;
+                    
+                    varying vec3 vColor;
+                    varying float vLighting;
+                    
+                    void main() {
+                        gl_Position = uProjection * uView * uModel * vec4(aPosition, 1.0);
+                        
+                        // Simple lighting
+                        vec3 normal = normalize((uModel * vec4(aNormal, 0.0)).xyz);
+                        float light = max(dot(normal, normalize(uLightDirection)), 0.3);
+                        
+                        vColor = aColor;
+                        vLighting = light;
+                    }
+                `;
+                
+                const fragmentShaderSource = `
+                    precision mediump float;
+                    varying vec3 vColor;
+                    varying float vLighting;
+                    
+                    void main() {
+                        vec3 finalColor = vColor * vLighting;
+                        gl_FragColor = vec4(finalColor, 1.0);
+                    }
+                `;
+                
+                const vertexShader = this.compileShader(this.gl.VERTEX_SHADER, vertexShaderSource);
+                const fragmentShader = this.compileShader(this.gl.FRAGMENT_SHADER, fragmentShaderSource);
+                
+                if (!vertexShader || !fragmentShader) {
+                    return false;
+                }
+                
+                this.program = this.gl.createProgram();
+                this.gl.attachShader(this.program, vertexShader);
+                this.gl.attachShader(this.program, fragmentShader);
+                this.gl.linkProgram(this.program);
+                
+                if (!this.gl.getProgramParameter(this.program, this.gl.LINK_STATUS)) {
+                    console.error('❌ Program linking failed:', this.gl.getProgramInfoLog(this.program));
+                    return false;
+                }
+                
+                // Get locations
+                this.locations = {
+                    position: this.gl.getAttribLocation(this.program, 'aPosition'),
+                    color: this.gl.getAttribLocation(this.program, 'aColor'),
+                    normal: this.gl.getAttribLocation(this.program, 'aNormal'),
+                    projection: this.gl.getUniformLocation(this.program, 'uProjection'),
+                    view: this.gl.getUniformLocation(this.program, 'uView'),
+                    model: this.gl.getUniformLocation(this.program, 'uModel'),
+                    lightDirection: this.gl.getUniformLocation(this.program, 'uLightDirection')
+                };
+                
+                console.log('✅ Enhanced shaders created with lighting');
+                return true;
+            }
+            
+            compileShader(type, source) {
+                const shader = this.gl.createShader(type);
+                this.gl.shaderSource(shader, source);
+                this.gl.compileShader(shader);
+                
+                if (!this.gl.getShaderParameter(shader, this.gl.COMPILE_STATUS)) {
+                    console.error('❌ Shader compilation failed:', this.gl.getShaderInfoLog(shader));
+                    this.gl.deleteShader(shader);
+                    return null;
+                }
+                
+                return shader;
+            }
+            
+            createEnhancedTerrain() {
+                const size = 100;
+                const resolution = 2;
+                const vertices = [];
+                const colors = [];
+                const normals = [];
+                const indices = [];
+                
+                // Generate heightmap using noise
+                const heightMap = [];
+                for (let x = -size; x <= size; x += resolution) {
+                    heightMap[x] = {};
+                    for (let z = -size; z <= size; z += resolution) {
+                        let height = 0;
+                        height += this.noise(x * 0.02, z * 0.02) * 8;      // Base terrain
+                        height += this.noise(x * 0.05, z * 0.05) * 3;      // Medium details
+                        height += this.noise(x * 0.1, z * 0.1) * 1;        // Fine details
+                        height += this.noise(x * 0.001, z * 0.001) * 20;   // Large hills
+                        heightMap[x][z] = height;
+                    }
+                }
+                
+                let vertexIndex = 0;
+                
+                // Generate vertices with enhanced coloring
+                for (let x = -size; x <= size; x += resolution) {
+                    for (let z = -size; z <= size; z += resolution) {
+                        const height = heightMap[x][z];
+                        
+                        vertices.push(x, height, z);
+                        
+                        // Enhanced terrain coloring based on height and noise
+                        let r, g, b;
+                        if (height < -2) {
+                            // Water/Low areas - blue-green
+                            r = 0.1 + Math.random() * 0.1;
+                            g = 0.3 + Math.random() * 0.2;
+                            b = 0.6 + Math.random() * 0.2;
+                        } else if (height < 2) {
+                            // Grass - various greens
+                            r = 0.2 + Math.random() * 0.2;
+                            g = 0.6 + Math.random() * 0.3;
+                            b = 0.1 + Math.random() * 0.2;
+                        } else if (height < 8) {
+                            // Hills - darker greens and browns
+                            r = 0.3 + Math.random() * 0.2;
+                            g = 0.5 + Math.random() * 0.2;
+                            b = 0.1 + Math.random() * 0.1;
+                        } else {
+                            // Mountains - grays and browns
+                            r = 0.4 + Math.random() * 0.2;
+                            g = 0.4 + Math.random() * 0.2;
+                            b = 0.3 + Math.random() * 0.2;
+                        }
+                        
+                        colors.push(r, g, b);
+                        
+                        // Calculate normal (simplified)
+                        const normal = this.calculateTerrainNormal(heightMap, x, z, resolution);
+                        normals.push(normal[0], normal[1], normal[2]);
+                        
+                        vertexIndex++;
+                    }
+                }
+                
+                // Generate indices for triangles
+                const width = (size * 2) / resolution + 1;
+                for (let x = 0; x < width - 1; x++) {
+                    for (let z = 0; z < width - 1; z++) {
+                        const topLeft = x * width + z;
+                        const topRight = topLeft + 1;
+                        const bottomLeft = (x + 1) * width + z;
+                        const bottomRight = bottomLeft + 1;
+                        
+                        // Two triangles per quad
+                        indices.push(topLeft, bottomLeft, topRight);
+                        indices.push(topRight, bottomLeft, bottomRight);
+                    }
+                }
+                
+                this.terrain = this.createMesh(vertices, colors, normals, indices);
+                console.log('✅ Enhanced terrain created with', vertices.length / 3, 'vertices');
+            }
+            
+            calculateTerrainNormal(heightMap, x, z, resolution) {
+                const left = heightMap[x - resolution] ? heightMap[x - resolution][z] || 0 : 0;
+                const right = heightMap[x + resolution] ? heightMap[x + resolution][z] || 0 : 0;
+                const up = heightMap[x] ? heightMap[x][z - resolution] || 0 : 0;
+                const down = heightMap[x] ? heightMap[x][z + resolution] || 0 : 0;
+                
+                const normal = [
+                    (left - right) / (2 * resolution),
+                    2,
+                    (up - down) / (2 * resolution)
+                ];
+                
+                return this.normalize(normal);
+            }
+            
+            createEnhancedRoad() {
+                const vertices = [];
+                const colors = [];
+                const normals = [];
+                const indices = [];
+                
+                let vertexIndex = 0;
+                
+                // Create curved road with banking
+                for (let t = -100; t <= 100; t += 0.5) {
+                    const roadCurve = Math.sin(t * 0.02) * 5; // Gentle curves
+                    const roadHeight = 0.3 + Math.sin(t * 0.01) * 0.2; // Gentle elevation changes
+                    
+                    const width = 3;
+                    const segments = 8;
+                    
+                    for (let i = 0; i <= segments; i++) {
+                        const u = (i / segments - 0.5) * 2; // -1 to 1
+                        const x = roadCurve + u * width;
+                        const y = roadHeight;
+                        const z = t;
+                        
+                        vertices.push(x, y, z);
+                        
+                        // Road surface coloring
+                        if (Math.abs(u) < 0.1) {
+                            // Yellow center line
+                            colors.push(1.0, 1.0, 0.2);
+                        } else if (Math.abs(u) > 0.8) {
+                            // White edge lines
+                            colors.push(0.9, 0.9, 0.9);
+                        } else {
+                            // Dark asphalt with variation
+                            const variation = Math.random() * 0.1;
+                            colors.push(0.2 + variation, 0.2 + variation, 0.2 + variation);
+                        }
+                        
+                        normals.push(0, 1, 0); // Flat road surface
+                        vertexIndex++;
+                    }
+                }
+                
+                // Generate indices for road surface
+                const segmentCount = segments + 1;
+                const lengthSegments = Math.floor((vertices.length / 3) / segmentCount) - 1;
+                
+                for (let i = 0; i < lengthSegments; i++) {
+                    for (let j = 0; j < segments; j++) {
+                        const a = i * segmentCount + j;
+                        const b = a + 1;
+                        const c = (i + 1) * segmentCount + j;
+                        const d = c + 1;
+                        
+                        indices.push(a, c, b);
+                        indices.push(b, c, d);
+                    }
+                }
+                
+                this.road = this.createMesh(vertices, colors, normals, indices);
+                console.log('✅ Enhanced curved road created');
+            }
+            
+            createRealisticCar() {
+                const vertices = [];
+                const colors = [];
+                const normals = [];
+                const indices = [];
+                
+                // Car body (more detailed)
+                const carParts = [
+                    // Main body
+                    { pos: [0, 0.5, 0], size: [1.8, 0.8, 4], color: [0.8, 0.1, 0.1] },
+                    // Hood
+                    { pos: [0, 0.9, 1.5], size: [1.6, 0.2, 1.5], color: [0.9, 0.1, 0.1] },
+                    // Roof
+                    { pos: [0, 1.3, -0.5], size: [1.4, 0.3, 2], color: [0.7, 0.1, 0.1] },
+                    // Windshield
+                    { pos: [0, 1.4, 0.8], size: [1.3, 0.8, 0.1], color: [0.3, 0.5, 0.8] },
+                    // Rear window
+                    { pos: [0, 1.4, -1.8], size: [1.3, 0.6, 0.1], color: [0.3, 0.5, 0.8] },
+                ];
+                
+                let vertexOffset = 0;
+                
+                carParts.forEach(part => {
+                    const [px, py, pz] = part.pos;
+                    const [sx, sy, sz] = part.size;
+                    const [r, g, b] = part.color;
+                    
+                    // Create box for this part
+                    const boxVertices = [
+                        // Front face
+                        [-sx/2, -sy/2,  sz/2], [ sx/2, -sy/2,  sz/2], [ sx/2,  sy/2,  sz/2], [-sx/2,  sy/2,  sz/2],
+                        // Back face
+                        [-sx/2, -sy/2, -sz/2], [-sx/2,  sy/2, -sz/2], [ sx/2,  sy/2, -sz/2], [ sx/2, -sy/2, -sz/2],
+                        // Top face
+                        [-sx/2,  sy/2, -sz/2], [-sx/2,  sy/2,  sz/2], [ sx/2,  sy/2,  sz/2], [ sx/2,  sy/2, -sz/2],
+                        // Bottom face
+                        [-sx/2, -sy/2, -sz/2], [ sx/2, -sy/2, -sz/2], [ sx/2, -sy/2,  sz/2], [-sx/2, -sy/2,  sz/2],
+                        // Right face
+                        [ sx/2, -sy/2, -sz/2], [ sx/2,  sy/2, -sz/2], [ sx/2,  sy/2,  sz/2], [ sx/2, -sy/2,  sz/2],
+                        // Left face
+                        [-sx/2, -sy/2, -sz/2], [-sx/2, -sy/2,  sz/2], [-sx/2,  sy/2,  sz/2], [-sx/2,  sy/2, -sz/2]
+                    ];
+                    
+                    boxVertices.forEach(vertex => {
+                        vertices.push(vertex[0] + px, vertex[1] + py, vertex[2] + pz);
+                        colors.push(r + Math.random() * 0.1, g + Math.random() * 0.05, b + Math.random() * 0.05);
+                    });
+                    
+                    // Normals for each face
+                    const faceNormals = [
+                        [0, 0, 1], [0, 0, 1], [0, 0, 1], [0, 0, 1],     // Front
+                        [0, 0, -1], [0, 0, -1], [0, 0, -1], [0, 0, -1], // Back
+                        [0, 1, 0], [0, 1, 0], [0, 1, 0], [0, 1, 0],     // Top
+                        [0, -1, 0], [0, -1, 0], [0, -1, 0], [0, -1, 0], // Bottom
+                        [1, 0, 0], [1, 0, 0], [1, 0, 0], [1, 0, 0],     // Right
+                        [-1, 0, 0], [-1, 0, 0], [-1, 0, 0], [-1, 0, 0]  // Left
+                    ];
+                    
+                    faceNormals.forEach(normal => {
+                        normals.push(normal[0], normal[1], normal[2]);
+                    });
+                    
+                    // Indices for this box
+                    for (let i = 0; i < 6; i++) {
+                        const offset = vertexOffset + i * 4;
+                        indices.push(offset, offset + 1, offset + 2);
+                        indices.push(offset, offset + 2, offset + 3);
+                    }
+                    
+                    vertexOffset += 24; // 6 faces * 4 vertices
+                });
+                
+                // Add wheels
+                const wheelPositions = [
+                    [-1.2, -0.3, 1.5], [1.2, -0.3, 1.5],   // Front wheels
+                    [-1.2, -0.3, -1.5], [1.2, -0.3, -1.5]  // Rear wheels
+                ];
+                
+                wheelPositions.forEach(wheelPos => {
+                    // Simple wheel (cylinder approximation)
+                    const segments = 8;
+                    const radius = 0.4;
+                    const width = 0.3;
+                    
+                    for (let i = 0; i < segments; i++) {
+                        const angle1 = (i / segments) * Math.PI * 2;
+                        const angle2 = ((i + 1) / segments) * Math.PI * 2;
+                        
+                        const x1 = Math.cos(angle1) * radius;
+                        const y1 = Math.sin(angle1) * radius;
+                        const x2 = Math.cos(angle2) * radius;
+                        const y2 = Math.sin(angle2) * radius;
+                        
+                        // Wheel side
+                        vertices.push(wheelPos[0] + x1, wheelPos[1] + y1, wheelPos[2] - width/2);
+                        vertices.push(wheelPos[0] + x2, wheelPos[1] + y2, wheelPos[2] - width/2);
+                        vertices.push(wheelPos[0] + x1, wheelPos[1] + y1, wheelPos[2] + width/2);
+                        vertices.push(wheelPos[0] + x2, wheelPos[1] + y2, wheelPos[2] + width/2);
+                        
+                        // Black wheel color
+                        for (let j = 0; j < 4; j++) {
+                            colors.push(0.1, 0.1, 0.1);
+                        }
+                        
+                        // Wheel normals (simplified)
+                        normals.push(x1, y1, 0);
+                        normals.push(x2, y2, 0);
+                        normals.push(x1, y1, 0);
+                        normals.push(x2, y2, 0);
+                        
+                        // Wheel indices
+                        const offset = vertexOffset;
+                        indices.push(offset, offset + 1, offset + 2);
+                        indices.push(offset + 1, offset + 3, offset + 2);
+                        
+                        vertexOffset += 4;
+                    }
+                });
+                
+                this.carMesh = this.createMesh(vertices, colors, normals, indices);
+                console.log('✅ Realistic car model created with detailed body and wheels');
+            }
+            
+            createTrees() {
+                const vertices = [];
+                const colors = [];
+                const normals = [];
+                const indices = [];
+                
+                let vertexOffset = 0;
+                
+                // Generate random trees around the road
+                for (let i = 0; i < 50; i++) {
+                    const x = (Math.random() - 0.5) * 150;
+                    const z = (Math.random() - 0.5) * 200;
+                    
+                    // Don't place trees on the road
+                    if (Math.abs(x - Math.sin(z * 0.02) * 5) < 8) continue;
+                    
+                    const height = 3 + Math.random() * 4;
+                    const trunkHeight = height * 0.3;
+                    const y = this.getTerrainHeight(x, z);
+                    
+                    // Tree trunk
+                    const trunkVertices = [
+                        [x - 0.2, y, z - 0.2], [x + 0.2, y, z - 0.2],
+                        [x + 0.2, y + trunkHeight, z - 0.2], [x - 0.2, y + trunkHeight, z - 0.2],
+                        [x - 0.2, y, z + 0.2], [x - 0.2, y + trunkHeight, z + 0.2],
+                        [x + 0.2, y + trunkHeight, z + 0.2], [x + 0.2, y, z + 0.2]
+                    ];
+                    
+                    trunkVertices.forEach(vertex => {
+                        vertices.push(vertex[0], vertex[1], vertex[2]);
+                        colors.push(0.4 + Math.random() * 0.2, 0.2 + Math.random() * 0.1, 0.1);
+                        normals.push(0, 1, 0);
+                    });
+                    
+                    // Trunk indices (simplified box)
+                    const trunkIndices = [
+                        0, 1, 2, 0, 2, 3,  // front
+                        4, 7, 6, 4, 6, 5,  // back
+                        0, 4, 5, 0, 5, 1,  // left
+                        2, 6, 7, 2, 7, 3,  // right
+                        1, 5, 6, 1, 6, 2,  // top
+                        0, 3, 7, 0, 7, 4   // bottom
+                    ];
+                    
+                    trunkIndices.forEach(index => indices.push(index + vertexOffset));
+                    vertexOffset += 8;
+                    
+                    // Tree foliage (simple pyramid)
+                    const foliageY = y + trunkHeight;
+                    const foliageVertices = [
+                        [x, foliageY + height * 0.7, z],              // top
+                        [x - 1, foliageY, z - 1], [x + 1, foliageY, z - 1],
+                        [x + 1, foliageY, z + 1], [x - 1, foliageY, z + 1]
+                    ];
+                    
+                    foliageVertices.forEach(vertex => {
+                        vertices.push(vertex[0], vertex[1], vertex[2]);
+                        colors.push(0.1 + Math.random() * 0.3, 0.5 + Math.random() * 0.3, 0.1 + Math.random() * 0.2);
+                        normals.push(0, 1, 0);
+                    });
+                    
+                    // Foliage indices (pyramid)
+                    const foliageIndices = [
+                        0, 1, 2,  0, 2, 3,  0, 3, 4,  0, 4, 1,  // sides
+                        1, 4, 3,  1, 3, 2   // bottom
+                    ];
+                    
+                    foliageIndices.forEach(index => indices.push(index + vertexOffset));
+                    vertexOffset += 5;
+                }
+                
+                this.trees = this.createMesh(vertices, colors, normals, indices);
+                console.log('✅ Environmental trees created');
+            }
+            
+            getTerrainHeight(x, z) {
+                // Approximate terrain height for tree placement
+                let height = 0;
+                height += this.noise(x * 0.02, z * 0.02) * 8;
+                height += this.noise(x * 0.05, z * 0.05) * 3;
+                height += this.noise(x * 0.1, z * 0.1) * 1;
+                height += this.noise(x * 0.001, z * 0.001) * 20;
+                return height;
+            }
+            
+            createMesh(vertices, colors, normals, indices) {
+                const mesh = {
+                    vertexCount: indices ? indices.length : vertices.length / 3
+                };
+                
+                // Position buffer
+                mesh.positionBuffer = this.gl.createBuffer();
+                this.gl.bindBuffer(this.gl.ARRAY_BUFFER, mesh.positionBuffer);
+                this.gl.bufferData(this.gl.ARRAY_BUFFER, new Float32Array(vertices), this.gl.STATIC_DRAW);
+                
+                // Color buffer
+                mesh.colorBuffer = this.gl.createBuffer();
+                this.gl.bindBuffer(this.gl.ARRAY_BUFFER, mesh.colorBuffer);
+                this.gl.bufferData(this.gl.ARRAY_BUFFER, new Float32Array(colors), this.gl.STATIC_DRAW);
+                
+                // Normal buffer
+                mesh.normalBuffer = this.gl.createBuffer();
+                this.gl.bindBuffer(this.gl.ARRAY_BUFFER, mesh.normalBuffer);
+                this.gl.bufferData(this.gl.ARRAY_BUFFER, new Float32Array(normals), this.gl.STATIC_DRAW);
+                
+                // Index buffer (if provided)
+                if (indices) {
+                    mesh.indexBuffer = this.gl.createBuffer();
+                    this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, mesh.indexBuffer);
+                    this.gl.bufferData(this.gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indices), this.gl.STATIC_DRAW);
+                    mesh.hasIndices = true;
+                } else {
+                    mesh.hasIndices = false;
+                }
+                
+                return mesh;
+            }
+            
+            setupInput() {
+                document.addEventListener('keydown', (e) => {
+                    this.keys[e.code] = true;
+                    if (e.code === 'Space') e.preventDefault();
+                    
+                    // Camera switching
+                    if (e.code === 'KeyC') {
+                        this.switchCamera();
+                    }
+                });
+                
+                document.addEventListener('keyup', (e) => {
+                    this.keys[e.code] = false;
+                });
+                
+                // Mouse controls for camera
+                document.addEventListener('mousemove', (e) => {
+                    this.mouse.x = e.clientX;
+                    this.mouse.y = e.clientY;
+                    
+                    if (this.camera.mode === 'orbit') {
+                        this.camera.mouseX = (e.clientX / window.innerWidth - 0.5) * 4;
+                        this.camera.mouseY = (e.clientY / window.innerHeight - 0.5) * 2;
+                    }
+                });
+                
+                document.addEventListener('mousedown', () => {
+                    this.mouse.down = true;
+                });
+                
+                document.addEventListener('mouseup', () => {
+                    this.mouse.down = false;
+                });
+                
+                window.addEventListener('resize', () => {
+                    this.canvas.width = window.innerWidth;
+                    this.canvas.height = window.innerHeight;
+                    this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
+                });
+                
+                console.log('✅ Enhanced input system setup complete');
+            }
+            
+            switchCamera() {
+                const modes = ['follow', 'chase', 'orbit', 'cockpit'];
+                const currentIndex = modes.indexOf(this.camera.mode);
+                this.camera.mode = modes[(currentIndex + 1) % modes.length];
+                document.getElementById('cameraMode').textContent = this.camera.mode.charAt(0).toUpperCase() + this.camera.mode.slice(1);
+                console.log('📷 Camera mode switched to:', this.camera.mode);
+            }
+            
+            updateCamera() {
+                const car = this.car;
+                const cam = this.camera;
+                
+                switch (cam.mode) {
+                    case 'follow':
+                        // Smooth following camera
+                        const targetX = car.position[0] - Math.sin(car.rotation) * cam.distance;
+                        const targetY = car.position[1] + cam.height;
+                        const targetZ = car.position[2] - Math.cos(car.rotation) * cam.distance;
+                        
+                        cam.position[0] += (targetX - cam.position[0]) * cam.smoothing;
+                        cam.position[1] += (targetY - cam.position[1]) * cam.smoothing;
+                        cam.position[2] += (targetZ - cam.position[2]) * cam.smoothing;
+                        
+                        cam.target[0] = car.position[0] + Math.sin(car.rotation) * 5;
+                        cam.target[1] = car.position[1] + 2;
+                        cam.target[2] = car.position[2] + Math.cos(car.rotation) * 5;
+                        break;
+                        
+                    case 'chase':
+                        // Tighter chase camera
+                        cam.position[0] = car.position[0] - Math.sin(car.rotation) * 8;
+                        cam.position[1] = car.position[1] + 4;
+                        cam.position[2] = car.position[2] - Math.cos(car.rotation) * 8;
+                        
+                        cam.target[0] = car.position[0];
+                        cam.target[1] = car.position[1] + 1;
+                        cam.target[2] = car.position[2];
+                        break;
+                        
+                    case 'orbit':
+                        // Orbiting camera with mouse control
+                        cam.angle += 0.01;
+                        const orbitRadius = 20 + cam.mouseY * 10;
+                        const orbitHeight = 10 + cam.mouseY * 5;
+                        
+                        cam.position[0] = car.position[0] + Math.sin(cam.angle + cam.mouseX) * orbitRadius;
+                        cam.position[1] = car.position[1] + orbitHeight;
+                        cam.position[2] = car.position[2] + Math.cos(cam.angle + cam.mouseX) * orbitRadius;
+                        
+                        cam.target[0] = car.position[0];
+                        cam.target[1] = car.position[1];
+                        cam.target[2] = car.position[2];
+                        break;
+                        
+                    case 'cockpit':
+                        // First-person view
+                        cam.position[0] = car.position[0];
+                        cam.position[1] = car.position[1] + 1.5;
+                        cam.position[2] = car.position[2];
+                        
+                        cam.target[0] = car.position[0] + Math.sin(car.rotation) * 10;
+                        cam.target[1] = car.position[1] + 1.5;
+                        cam.target[2] = car.position[2] + Math.cos(car.rotation) * 10;
+                        break;
+                }
+            }
+            
+            update(deltaTime) {
+                // Enhanced car physics
+                let acceleration = 0;
+                let steering = 0;
+                const maxSpeed = 25;
+                
+                if (this.keys['KeyW'] || this.keys['ArrowUp']) acceleration = 20;
+                if (this.keys['KeyS'] || this.keys['ArrowDown']) acceleration = -15;
+                if (this.keys['KeyA'] || this.keys['ArrowLeft']) steering = -3;
+                if (this.keys['KeyD'] || this.keys['ArrowRight']) steering = 3;
+                
+                // Enhanced braking
+                if (this.keys['Space']) {
+                    this.car.velocity[0] *= 0.8;
+                    this.car.velocity[1] *= 0.8;
+                }
+                
+                // Steering based on speed
+                const speedFactor = Math.min(Math.abs(this.car.speed) / 10, 1);
+                this.car.steerAngle = steering * speedFactor;
+                
+                // Update car rotation with smooth steering
+                if (Math.abs(this.car.velocity[0]) > 0.1 || Math.abs(this.car.velocity[1]) > 0.1) {
+                    this.car.rotation += this.car.steerAngle * deltaTime;
+                }
+                
+                // Calculate forward direction
+                const cos = Math.cos(this.car.rotation);
+                const sin = Math.sin(this.car.rotation);
+                
+                // Apply acceleration
+                this.car.velocity[0] += sin * acceleration * deltaTime;
+                this.car.velocity[1] += cos * acceleration * deltaTime;
+                
+                // Speed limiting
+                const currentSpeed = Math.sqrt(this.car.velocity[0] ** 2 + this.car.velocity[1] ** 2);
+                if (currentSpeed > maxSpeed) {
+                    this.car.velocity[0] = (this.car.velocity[0] / currentSpeed) * maxSpeed;
+                    this.car.velocity[1] = (this.car.velocity[1] / currentSpeed) * maxSpeed;
+                }
+                
+                // Enhanced friction
+                this.car.velocity[0] *= 0.985;
+                this.car.velocity[1] *= 0.985;
+                
+                // Update position
+                this.car.position[0] += this.car.velocity[0] * deltaTime;
+                this.car.position[2] += this.car.velocity[1] * deltaTime;
+                
+                // Keep car on terrain
+                this.car.position[1] = this.getTerrainHeight(this.car.position[0], this.car.position[2]) + 0.5;
+                
+                // Calculate speed for UI
+                this.car.speed = currentSpeed * 2.5; // Convert to mph-like units
+                
+                // Update wheel rotation
+                this.car.wheelRotation += currentSpeed * deltaTime * 2;
+                
+                // Update camera
+                this.updateCamera();
+                
+                // Update UI
+                document.getElementById('speed').textContent = Math.round(this.car.speed);
+                document.getElementById('carX').textContent = this.car.position[0].toFixed(1);
+                document.getElementById('carZ').textContent = this.car.position[2].toFixed(1);
+            }
+            
+            startRenderLoop() {
+                const render = (currentTime) => {
+                    const deltaTime = Math.min((currentTime - this.lastTime) / 1000, 0.016);
+                    this.lastTime = currentTime;
+                    
+                    this.frameCount++;
+                    
+                    if (this.frameCount % 60 === 0) {
+                        document.getElementById('fps').textContent = Math.round(1 / deltaTime);
+                    }
+                    
+                    this.update(deltaTime);
+                    this.render();
+                    
+                    requestAnimationFrame(render);
+                };
+                
+                this.lastTime = performance.now();
+                requestAnimationFrame(render);
+                console.log('✅ Enhanced render loop started');
+            }
+            
+            render() {
+                const gl = this.gl;
+                
+                // Enhanced sky gradient
+                gl.clearColor(0.53, 0.81, 0.98, 1.0);
+                gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+                
+                // Use shader program
+                gl.useProgram(this.program);
+                
+                // Set up matrices
+                const projection = this.createPerspectiveMatrix(
+                    70 * Math.PI / 180,
+                    this.canvas.width / this.canvas.height,
+                    0.1,
+                    500
+                );
+                
+                const view = this.createViewMatrix(
+                    this.camera.position,
+                    this.camera.target,
+                    this.camera.up
+                );
+                
+                gl.uniformMatrix4fv(this.locations.projection, false, projection);
+                gl.uniformMatrix4fv(this.locations.view, false, view);
+                
+                // Set lighting direction
+                gl.uniform3f(this.locations.lightDirection, 0.5, 1.0, 0.3);
+                
+                // Render terrain
+                const terrainModel = this.createModelMatrix([0, 0, 0], [0, 0, 0], [1, 1, 1]);
+                this.renderMesh(this.terrain, terrainModel);
+                
+                // Render road
+                const roadModel = this.createModelMatrix([0, 0, 0], [0, 0, 0], [1, 1, 1]);
+                this.renderMesh(this.road, roadModel);
+                
+                // Render trees
+                if (this.trees) {
+                    const treeModel = this.createModelMatrix([0, 0, 0], [0, 0, 0], [1, 1, 1]);
+                    this.renderMesh(this.trees, treeModel);
+                }
+                
+                // Render car
+                const carModel = this.createModelMatrix(
+                    this.car.position,
+                    [0, this.car.rotation, 0],
+                    [1, 1, 1]
+                );
+                this.renderMesh(this.carMesh, carModel);
+            }
+            
+            renderMesh(mesh, modelMatrix) {
+                const gl = this.gl;
+                
+                gl.uniformMatrix4fv(this.locations.model, false, modelMatrix);
+                
+                // Bind position buffer
+                gl.bindBuffer(gl.ARRAY_BUFFER, mesh.positionBuffer);
+                gl.enableVertexAttribArray(this.locations.position);
+                gl.vertexAttribPointer(this.locations.position, 3, gl.FLOAT, false, 0, 0);
+                
+                // Bind color buffer
+                gl.bindBuffer(gl.ARRAY_BUFFER, mesh.colorBuffer);
+                gl.enableVertexAttribArray(this.locations.color);
+                gl.vertexAttribPointer(this.locations.color, 3, gl.FLOAT, false, 0, 0);
+                
+                // Bind normal buffer
+                gl.bindBuffer(gl.ARRAY_BUFFER, mesh.normalBuffer);
+                gl.enableVertexAttribArray(this.locations.normal);
+                gl.vertexAttribPointer(this.locations.normal, 3, gl.FLOAT, false, 0, 0);
+                
+                // Draw mesh
+                if (mesh.hasIndices) {
+                    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, mesh.indexBuffer);
+                    gl.drawElements(gl.TRIANGLES, mesh.vertexCount, gl.UNSIGNED_SHORT, 0);
+                } else {
+                    gl.drawArrays(gl.TRIANGLES, 0, mesh.vertexCount);
+                }
+            }
+            
+            createPerspectiveMatrix(fov, aspect, near, far) {
+                const f = 1.0 / Math.tan(fov / 2);
+                const rangeInv = 1 / (near - far);
+                
+                return new Float32Array([
+                    f / aspect, 0, 0, 0,
+                    0, f, 0, 0,
+                    0, 0, (near + far) * rangeInv, -1,
+                    0, 0, near * far * rangeInv * 2, 0
+                ]);
+            }
+            
+            createViewMatrix(eye, center, up) {
+                const f = this.normalize([
+                    center[0] - eye[0],
+                    center[1] - eye[1],
+                    center[2] - eye[2]
+                ]);
+                
+                const s = this.normalize(this.cross(f, up));
+                const u = this.cross(s, f);
+                
+                return new Float32Array([
+                    s[0], u[0], -f[0], 0,
+                    s[1], u[1], -f[1], 0,
+                    s[2], u[2], -f[2], 0,
+                    -this.dot(s, eye), -this.dot(u, eye), this.dot(f, eye), 1
+                ]);
+            }
+            
+            createModelMatrix(translation, rotation, scale) {
+                const [tx, ty, tz] = translation;
+                const [rx, ry, rz] = rotation;
+                const [sx, sy, sz] = scale;
+                
+                const cosY = Math.cos(ry);
+                const sinY = Math.sin(ry);
+                
+                return new Float32Array([
+                    cosY * sx, 0, sinY * sx, 0,
+                    0, sy, 0, 0,
+                    -sinY * sz, 0, cosY * sz, 0,
+                    tx, ty, tz, 1
+                ]);
+            }
+            
+            normalize(v) {
+                const len = Math.sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]);
+                return len > 0 ? [v[0] / len, v[1] / len, v[2] / len] : [0, 0, 0];
+            }
+            
+            cross(a, b) {
+                return [
+                    a[1] * b[2] - a[2] * b[1],
+                    a[2] * b[0] - a[0] * b[2],
+                    a[0] * b[1] - a[1] * b[0]
+                ];
+            }
+            
+            dot(a, b) {
+                return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+            }
+            
+            updateStatus(message) {
+                document.getElementById('status').textContent = message;
+                console.log('🎮', message);
+            }
+        }
+        
+        // Start the enhanced game
+        window.addEventListener('load', () => {
+            console.log('🚀 Page loaded, starting enhanced zen drive...');
+            new ZenDriveEnhanced();
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zen Drive - Fixed 3D Version</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            background: #000;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+        }
+        #gameCanvas {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+            background: #87CEEB;
+        }
+        #ui {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: white;
+            background: rgba(0,0,0,0.8);
+            padding: 15px;
+            border-radius: 8px;
+            z-index: 100;
+            font-size: 14px;
+        }
+        #controls {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            color: white;
+            background: rgba(0,0,0,0.8);
+            padding: 15px;
+            border-radius: 8px;
+            z-index: 100;
+            font-size: 14px;
+        }
+        #loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-size: 24px;
+            z-index: 1000;
+        }
+    </style>
+</head>
+<body>
+    <div id="loading">Loading 3D World...</div>
+    <canvas id="gameCanvas"></canvas>
+    <div id="ui">
+        <div>Speed: <span id="speed">0</span> mph</div>
+        <div>FPS: <span id="fps">60</span></div>
+        <div>Status: <span id="status">Starting...</span></div>
+        <div>Car: X=<span id="carX">0</span> Z=<span id="carZ">0</span></div>
+    </div>
+    <div id="controls">
+        <div><strong>Controls:</strong></div>
+        <div>W/↑ - Accelerate</div>
+        <div>S/↓ - Reverse</div>
+        <div>A/← - Turn Left</div>
+        <div>D/→ - Turn Right</div>
+        <div>Space - Brake</div>
+    </div>
+
+    <script>
+        console.log('Starting Zen Drive 3D Game...');
+        
+        class ZenDrive3D {
+            constructor() {
+                this.canvas = document.getElementById('gameCanvas');
+                this.gl = null;
+                this.program = null;
+                
+                // Camera
+                this.camera = {
+                    position: [0, 8, 15],
+                    target: [0, 0, 0],
+                    up: [0, 1, 0]
+                };
+                
+                // Car
+                this.car = {
+                    position: [0, 1, 0],
+                    rotation: 0,
+                    velocity: [0, 0],
+                    speed: 0
+                };
+                
+                // Input
+                this.keys = {};
+                this.mouseDown = false;
+                
+                // Meshes
+                this.terrain = null;
+                this.road = null;
+                this.carMesh = null;
+                
+                // Timing
+                this.lastTime = 0;
+                this.frameCount = 0;
+                
+                this.init();
+            }
+            
+            async init() {
+                try {
+                    this.updateStatus('Initializing WebGL...');
+                    await this.sleep(100);
+                    
+                    if (!this.initWebGL()) {
+                        throw new Error('WebGL initialization failed');
+                    }
+                    
+                    this.updateStatus('Creating shaders...');
+                    await this.sleep(100);
+                    
+                    if (!this.createShaders()) {
+                        throw new Error('Shader creation failed');
+                    }
+                    
+                    this.updateStatus('Generating terrain...');
+                    await this.sleep(100);
+                    this.createTerrain();
+                    
+                    this.updateStatus('Creating road...');
+                    await this.sleep(100);
+                    this.createRoad();
+                    
+                    this.updateStatus('Building car...');
+                    await this.sleep(100);
+                    this.createCar();
+                    
+                    this.updateStatus('Setting up controls...');
+                    await this.sleep(100);
+                    this.setupInput();
+                    
+                    document.getElementById('loading').style.display = 'none';
+                    this.updateStatus('Ready! Drive with WASD');
+                    
+                    this.startRenderLoop();
+                    
+                } catch (error) {
+                    console.error('Initialization error:', error);
+                    this.updateStatus('Error: ' + error.message);
+                }
+            }
+            
+            sleep(ms) {
+                return new Promise(resolve => setTimeout(resolve, ms));
+            }
+            
+            initWebGL() {
+                this.canvas.width = window.innerWidth;
+                this.canvas.height = window.innerHeight;
+                
+                this.gl = this.canvas.getContext('webgl') || this.canvas.getContext('experimental-webgl');
+                
+                if (!this.gl) {
+                    alert('WebGL not supported in this browser');
+                    return false;
+                }
+                
+                console.log('WebGL context created successfully');
+                
+                // Enable depth testing
+                this.gl.enable(this.gl.DEPTH_TEST);
+                this.gl.depthFunc(this.gl.LEQUAL);
+                
+                // Set viewport
+                this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
+                
+                return true;
+            }
+            
+            createShaders() {
+                const vertexShaderSource = `
+                    attribute vec3 aPosition;
+                    attribute vec3 aColor;
+                    
+                    uniform mat4 uProjection;
+                    uniform mat4 uView;
+                    uniform mat4 uModel;
+                    
+                    varying vec3 vColor;
+                    
+                    void main() {
+                        gl_Position = uProjection * uView * uModel * vec4(aPosition, 1.0);
+                        vColor = aColor;
+                    }
+                `;
+                
+                const fragmentShaderSource = `
+                    precision mediump float;
+                    varying vec3 vColor;
+                    
+                    void main() {
+                        gl_FragColor = vec4(vColor, 1.0);
+                    }
+                `;
+                
+                const vertexShader = this.compileShader(this.gl.VERTEX_SHADER, vertexShaderSource);
+                const fragmentShader = this.compileShader(this.gl.FRAGMENT_SHADER, fragmentShaderSource);
+                
+                if (!vertexShader || !fragmentShader) {
+                    return false;
+                }
+                
+                this.program = this.gl.createProgram();
+                this.gl.attachShader(this.program, vertexShader);
+                this.gl.attachShader(this.program, fragmentShader);
+                this.gl.linkProgram(this.program);
+                
+                if (!this.gl.getProgramParameter(this.program, this.gl.LINK_STATUS)) {
+                    console.error('Program linking failed:', this.gl.getProgramInfoLog(this.program));
+                    return false;
+                }
+                
+                // Get locations
+                this.locations = {
+                    position: this.gl.getAttribLocation(this.program, 'aPosition'),
+                    color: this.gl.getAttribLocation(this.program, 'aColor'),
+                    projection: this.gl.getUniformLocation(this.program, 'uProjection'),
+                    view: this.gl.getUniformLocation(this.program, 'uView'),
+                    model: this.gl.getUniformLocation(this.program, 'uModel')
+                };
+                
+                console.log('Shaders created successfully');
+                return true;
+            }
+            
+            compileShader(type, source) {
+                const shader = this.gl.createShader(type);
+                this.gl.shaderSource(shader, source);
+                this.gl.compileShader(shader);
+                
+                if (!this.gl.getShaderParameter(shader, this.gl.COMPILE_STATUS)) {
+                    console.error('Shader compilation failed:', this.gl.getShaderInfoLog(shader));
+                    this.gl.deleteShader(shader);
+                    return null;
+                }
+                
+                return shader;
+            }
+            
+            createTerrain() {
+                const size = 30;
+                const vertices = [];
+                const colors = [];
+                const indices = [];
+                let index = 0;
+                
+                // Create grid vertices
+                for (let x = -size; x <= size; x += 2) {
+                    for (let z = -size; z <= size; z += 2) {
+                        const height = Math.sin(x * 0.1) * Math.cos(z * 0.1) * 1.5;
+                        
+                        vertices.push(x, height, z);
+                        colors.push(0.3 + Math.random() * 0.2, 0.7 + Math.random() * 0.2, 0.2);
+                        
+                        if (x < size && z < size) {
+                            const i = index;
+                            const width = size * 2 / 2 + 1;
+                            
+                            // Two triangles per quad
+                            indices.push(i, i + 1, i + width);
+                            indices.push(i + 1, i + width + 1, i + width);
+                        }
+                        index++;
+                    }
+                }
+                
+                this.terrain = this.createMesh(vertices, colors, indices);
+                console.log('Terrain created with', vertices.length / 3, 'vertices');
+            }
+            
+            createRoad() {
+                const vertices = [];
+                const colors = [];
+                const indices = [];
+                
+                // Create road strip
+                for (let z = -50; z < 50; z += 1) {
+                    const y = 0.2;
+                    
+                    // Left edge
+                    vertices.push(-1.5, y, z);
+                    colors.push(0.2, 0.2, 0.2);
+                    
+                    // Right edge
+                    vertices.push(1.5, y, z);
+                    colors.push(0.2, 0.2, 0.2);
+                    
+                    // Center line vertices for yellow stripe
+                    vertices.push(-0.1, y + 0.01, z);
+                    colors.push(1.0, 1.0, 0.0);
+                    
+                    vertices.push(0.1, y + 0.01, z);
+                    colors.push(1.0, 1.0, 0.0);
+                }
+                
+                // Create indices for road surface
+                for (let i = 0; i < vertices.length / 3 - 4; i += 4) {
+                    // Road surface
+                    indices.push(i, i + 1, i + 4);
+                    indices.push(i + 1, i + 5, i + 4);
+                    
+                    // Center line
+                    indices.push(i + 2, i + 3, i + 6);
+                    indices.push(i + 3, i + 7, i + 6);
+                }
+                
+                this.road = this.createMesh(vertices, colors, indices);
+                console.log('Road created');
+            }
+            
+            createCar() {
+                const vertices = [
+                    // Car body (box)
+                    // Front face
+                    -1, 0, 2,   1, 0, 2,   1, 1, 2,   -1, 1, 2,
+                    // Back face
+                    -1, 0, -2,  -1, 1, -2,  1, 1, -2,  1, 0, -2,
+                    // Top face
+                    -1, 1, -2,  -1, 1, 2,   1, 1, 2,   1, 1, -2,
+                    // Bottom face
+                    -1, 0, -2,  1, 0, -2,   1, 0, 2,   -1, 0, 2,
+                    // Right face
+                    1, 0, -2,   1, 1, -2,   1, 1, 2,   1, 0, 2,
+                    // Left face
+                    -1, 0, -2,  -1, 0, 2,   -1, 1, 2,  -1, 1, -2
+                ];
+                
+                const colors = [];
+                const indices = [];
+                
+                // Red car color
+                for (let i = 0; i < vertices.length / 3; i++) {
+                    colors.push(0.9, 0.1, 0.1);
+                }
+                
+                // Create indices for each face
+                for (let i = 0; i < 6; i++) {
+                    const offset = i * 4;
+                    indices.push(
+                        offset, offset + 1, offset + 2,
+                        offset, offset + 2, offset + 3
+                    );
+                }
+                
+                this.carMesh = this.createMesh(vertices, colors, indices);
+                console.log('Car created');
+            }
+            
+            createMesh(vertices, colors, indices) {
+                const mesh = {
+                    vertexCount: indices ? indices.length : vertices.length / 3
+                };
+                
+                // Position buffer
+                mesh.positionBuffer = this.gl.createBuffer();
+                this.gl.bindBuffer(this.gl.ARRAY_BUFFER, mesh.positionBuffer);
+                this.gl.bufferData(this.gl.ARRAY_BUFFER, new Float32Array(vertices), this.gl.STATIC_DRAW);
+                
+                // Color buffer
+                mesh.colorBuffer = this.gl.createBuffer();
+                this.gl.bindBuffer(this.gl.ARRAY_BUFFER, mesh.colorBuffer);
+                this.gl.bufferData(this.gl.ARRAY_BUFFER, new Float32Array(colors), this.gl.STATIC_DRAW);
+                
+                // Index buffer (if provided)
+                if (indices) {
+                    mesh.indexBuffer = this.gl.createBuffer();
+                    this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, mesh.indexBuffer);
+                    this.gl.bufferData(this.gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indices), this.gl.STATIC_DRAW);
+                    mesh.hasIndices = true;
+                } else {
+                    mesh.hasIndices = false;
+                }
+                
+                return mesh;
+            }
+            
+            setupInput() {
+                document.addEventListener('keydown', (e) => {
+                    this.keys[e.code] = true;
+                    if (e.code === 'Space') e.preventDefault();
+                });
+                
+                document.addEventListener('keyup', (e) => {
+                    this.keys[e.code] = false;
+                });
+                
+                window.addEventListener('resize', () => {
+                    this.canvas.width = window.innerWidth;
+                    this.canvas.height = window.innerHeight;
+                    this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
+                });
+                
+                console.log('Input setup complete');
+            }
+            
+            update(deltaTime) {
+                // Car physics
+                let acceleration = 0;
+                let steering = 0;
+                
+                if (this.keys['KeyW'] || this.keys['ArrowUp']) acceleration = 15;
+                if (this.keys['KeyS'] || this.keys['ArrowDown']) acceleration = -10;
+                if (this.keys['KeyA'] || this.keys['ArrowLeft']) steering = -2.5;
+                if (this.keys['KeyD'] || this.keys['ArrowRight']) steering = 2.5;
+                
+                // Apply braking
+                if (this.keys['Space']) {
+                    this.car.velocity[0] *= 0.85;
+                    this.car.velocity[1] *= 0.85;
+                }
+                
+                // Update car rotation
+                if (Math.abs(this.car.velocity[0]) > 0.1 || Math.abs(this.car.velocity[1]) > 0.1) {
+                    this.car.rotation += steering * deltaTime;
+                }
+                
+                // Calculate forward direction
+                const cos = Math.cos(this.car.rotation);
+                const sin = Math.sin(this.car.rotation);
+                
+                // Apply acceleration
+                this.car.velocity[0] += sin * acceleration * deltaTime;
+                this.car.velocity[1] += cos * acceleration * deltaTime;
+                
+                // Apply friction
+                this.car.velocity[0] *= 0.98;
+                this.car.velocity[1] *= 0.98;
+                
+                // Update position
+                this.car.position[0] += this.car.velocity[0] * deltaTime;
+                this.car.position[2] += this.car.velocity[1] * deltaTime;
+                
+                // Calculate speed
+                this.car.speed = Math.sqrt(
+                    this.car.velocity[0] * this.car.velocity[0] + 
+                    this.car.velocity[1] * this.car.velocity[1]
+                ) * 12;
+                
+                // Update camera to follow car
+                const cameraDistance = 12;
+                const cameraHeight = 6;
+                
+                this.camera.position[0] = this.car.position[0] - sin * cameraDistance;
+                this.camera.position[1] = this.car.position[1] + cameraHeight;
+                this.camera.position[2] = this.car.position[2] - cos * cameraDistance;
+                
+                this.camera.target[0] = this.car.position[0] + sin * 5;
+                this.camera.target[1] = this.car.position[1] + 1;
+                this.camera.target[2] = this.car.position[2] + cos * 5;
+                
+                // Update UI
+                document.getElementById('speed').textContent = Math.round(this.car.speed);
+                document.getElementById('carX').textContent = this.car.position[0].toFixed(1);
+                document.getElementById('carZ').textContent = this.car.position[2].toFixed(1);
+            }
+            
+            startRenderLoop() {
+                const render = (currentTime) => {
+                    const deltaTime = (currentTime - this.lastTime) / 1000;
+                    this.lastTime = currentTime;
+                    
+                    if (deltaTime < 0.1) { // Prevent huge delta times
+                        this.frameCount++;
+                        
+                        if (this.frameCount % 60 === 0) {
+                            document.getElementById('fps').textContent = Math.round(1 / deltaTime);
+                        }
+                        
+                        this.update(deltaTime);
+                        this.render();
+                    }
+                    
+                    requestAnimationFrame(render);
+                };
+                
+                this.lastTime = performance.now();
+                requestAnimationFrame(render);
+                console.log('Render loop started');
+            }
+            
+            render() {
+                const gl = this.gl;
+                
+                // Clear screen with sky color
+                gl.clearColor(0.53, 0.81, 0.92, 1.0);
+                gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+                
+                // Use shader program
+                gl.useProgram(this.program);
+                
+                // Set up matrices
+                const projection = this.createPerspectiveMatrix(
+                    60 * Math.PI / 180,
+                    this.canvas.width / this.canvas.height,
+                    0.1,
+                    1000
+                );
+                
+                const view = this.createViewMatrix(
+                    this.camera.position,
+                    this.camera.target,
+                    this.camera.up
+                );
+                
+                gl.uniformMatrix4fv(this.locations.projection, false, projection);
+                gl.uniformMatrix4fv(this.locations.view, false, view);
+                
+                // Render terrain
+                const terrainModel = this.createModelMatrix([0, 0, 0], [0, 0, 0], [1, 1, 1]);
+                this.renderMesh(this.terrain, terrainModel);
+                
+                // Render road
+                const roadModel = this.createModelMatrix([0, 0, 0], [0, 0, 0], [1, 1, 1]);
+                this.renderMesh(this.road, roadModel);
+                
+                // Render car
+                const carModel = this.createModelMatrix(
+                    this.car.position,
+                    [0, this.car.rotation, 0],
+                    [0.8, 0.8, 0.8]
+                );
+                this.renderMesh(this.carMesh, carModel);
+            }
+            
+            renderMesh(mesh, modelMatrix) {
+                const gl = this.gl;
+                
+                gl.uniformMatrix4fv(this.locations.model, false, modelMatrix);
+                
+                // Bind position buffer
+                gl.bindBuffer(gl.ARRAY_BUFFER, mesh.positionBuffer);
+                gl.enableVertexAttribArray(this.locations.position);
+                gl.vertexAttribPointer(this.locations.position, 3, gl.FLOAT, false, 0, 0);
+                
+                // Bind color buffer
+                gl.bindBuffer(gl.ARRAY_BUFFER, mesh.colorBuffer);
+                gl.enableVertexAttribArray(this.locations.color);
+                gl.vertexAttribPointer(this.locations.color, 3, gl.FLOAT, false, 0, 0);
+                
+                // Draw mesh
+                if (mesh.hasIndices) {
+                    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, mesh.indexBuffer);
+                    gl.drawElements(gl.TRIANGLES, mesh.vertexCount, gl.UNSIGNED_SHORT, 0);
+                } else {
+                    gl.drawArrays(gl.TRIANGLES, 0, mesh.vertexCount);
+                }
+            }
+            
+            createPerspectiveMatrix(fov, aspect, near, far) {
+                const f = 1.0 / Math.tan(fov / 2);
+                const rangeInv = 1 / (near - far);
+                
+                return new Float32Array([
+                    f / aspect, 0, 0, 0,
+                    0, f, 0, 0,
+                    0, 0, (near + far) * rangeInv, -1,
+                    0, 0, near * far * rangeInv * 2, 0
+                ]);
+            }
+            
+            createViewMatrix(eye, center, up) {
+                const f = this.normalize([
+                    center[0] - eye[0],
+                    center[1] - eye[1],
+                    center[2] - eye[2]
+                ]);
+                
+                const s = this.normalize(this.cross(f, up));
+                const u = this.cross(s, f);
+                
+                return new Float32Array([
+                    s[0], u[0], -f[0], 0,
+                    s[1], u[1], -f[1], 0,
+                    s[2], u[2], -f[2], 0,
+                    -this.dot(s, eye), -this.dot(u, eye), this.dot(f, eye), 1
+                ]);
+            }
+            
+            createModelMatrix(translation, rotation, scale) {
+                const [tx, ty, tz] = translation;
+                const [rx, ry, rz] = rotation;
+                const [sx, sy, sz] = scale;
+                
+                const cosY = Math.cos(ry);
+                const sinY = Math.sin(ry);
+                
+                return new Float32Array([
+                    cosY * sx, 0, sinY * sx, 0,
+                    0, sy, 0, 0,
+                    -sinY * sz, 0, cosY * sz, 0,
+                    tx, ty, tz, 1
+                ]);
+            }
+            
+            normalize(v) {
+                const len = Math.sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]);
+                return len > 0 ? [v[0] / len, v[1] / len, v[2] / len] : [0, 0, 0];
+            }
+            
+            cross(a, b) {
+                return [
+                    a[1] * b[2] - a[2] * b[1],
+                    a[2] * b[0] - a[0] * b[2],
+                    a[0] * b[1] - a[1] * b[0]
+                ];
+            }
+            
+            dot(a, b) {
+                return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+            }
+            
+            updateStatus(message) {
+                document.getElementById('status').textContent = message;
+                console.log('Status:', message);
+            }
+        }
+        
+        // Start the game
+        window.addEventListener('load', () => {
+            console.log('Page loaded, starting game...');
+            new ZenDrive3D();
+        });
+    </script>
+</body>
+</html>
